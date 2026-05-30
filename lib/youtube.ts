@@ -39,6 +39,21 @@ function mapPlaylistItem(item: YouTubePlaylistItem): Video {
   }
 }
 
+// Same shape as mapPlaylistItem but without isPick — used for uploads playlist fetches
+function mapUploadsItem(item: YouTubePlaylistItem): Video {
+  const t = item.snippet.thumbnails
+  return {
+    videoId:      item.snippet.resourceId.videoId,
+    title:        item.snippet.title,
+    description:  item.snippet.description,
+    thumbnailUrl: t.high?.url ?? t.medium?.url ?? t.default?.url ?? '',
+    channelId:    item.snippet.channelId,
+    channelName:  item.snippet.channelTitle,
+    publishedAt:  item.snippet.publishedAt,
+    embedType:    'youtube',
+  }
+}
+
 function mapChannelItem(item: YouTubeChannelResult): Partial<Channel> {
   const t = item.snippet.thumbnails
   return {
@@ -54,26 +69,38 @@ function mapChannelItem(item: YouTubeChannelResult): Partial<Channel> {
 // getChannelVideos is cached per channelId — 17 channels × 100 units = 1,700 units
 // per cache cycle (1 hour), well within the 10,000/day free quota.
 
-/** Fetch latest videos from a single channel — cached 1 hour per channelId */
+/**
+ * Fetch latest videos from a single channel via its uploads playlist.
+ * Costs 1 quota unit per call (vs 100 for search.list) — cached 1 hour per channelId.
+ *
+ * YouTube channels have a hidden uploads playlist whose ID is the channel ID
+ * with the leading "UC" replaced by "UU".
+ */
 export async function getChannelVideos(channelId: string, maxResults = 8): Promise<Video[]> {
   'use cache'
   cacheLife('hours')
 
   if (!API_KEY) return []
   try {
+    const uploadsPlaylistId = 'UU' + channelId.slice(2)
     const res = await fetch(
-      `${BASE}/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${API_KEY}`
+      `${BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}&key=${API_KEY}`
     )
     if (!res.ok) return []
     const data = await res.json()
-    return (data.items ?? []).map(mapSearchItem)
+    return (data.items ?? [])
+      .filter((item: YouTubePlaylistItem) =>
+        item.snippet.title !== 'Private video' &&
+        item.snippet.title !== 'Deleted video'
+      )
+      .map(mapUploadsItem)
   } catch {
     return []
   }
 }
 
 /** Fetch latest videos from multiple channels, merged and sorted by date */
-export async function getFeedVideos(channelIds: string[], maxPerChannel = 4): Promise<Video[]> {
+export async function getFeedVideos(channelIds: string[], maxPerChannel = 8): Promise<Video[]> {
   if (!API_KEY || channelIds.length === 0) return []
   const results = await Promise.allSettled(
     channelIds.map(id => getChannelVideos(id, maxPerChannel))
