@@ -5,6 +5,7 @@ import { enrichChannels } from '@/lib/youtube'
 import {
   getDynamicChannelIds,
   getRemovedChannelIds,
+  getAgeRestrictedChannelIds,
   getBlacklistedVideos,
   getAdminPicks,
   isKvConfigured,
@@ -17,6 +18,7 @@ import {
   logout,
   addChannel,
   deleteChannel,
+  toggleAgeRestriction,
   addToBlacklist,
   removeFromBlacklist,
   addPick,
@@ -88,9 +90,10 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
   const kvReady = isKvConfigured()
 
   // Read all state directly from KV (bypasses cache — always fresh)
-  const [dynamicIds, removedIds, blacklistedVideos, adminPicks] = await Promise.all([
+  const [dynamicIds, removedIds, ageRestrictedIds, blacklistedVideos, adminPicks] = await Promise.all([
     getDynamicChannelIds(),
     getRemovedChannelIds(),
+    getAgeRestrictedChannelIds(),
     getBlacklistedVideos(),
     getAdminPicks(),
   ])
@@ -99,24 +102,26 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
   const allIds = [...SEED_CHANNELS.map(c => c.channelId), ...dynamicIds]
   const meta   = await enrichChannels(allIds)
 
-  type AdminChannel = Channel & { source: 'seed' | 'dynamic'; isRemoved: boolean }
+  type AdminChannel = Channel & { source: 'seed' | 'dynamic'; isRemoved: boolean; isAgeRestricted: boolean }
 
   const channels: AdminChannel[] = [
     ...SEED_CHANNELS.map(ch => ({
       ...ch,
-      thumbnailUrl: meta[ch.channelId]?.thumbnailUrl ?? ch.thumbnailUrl,
-      description:  meta[ch.channelId]?.description  ?? ch.description,
-      source: 'seed' as const,
-      isRemoved: removedIds.has(ch.channelId),
+      thumbnailUrl:    meta[ch.channelId]?.thumbnailUrl ?? ch.thumbnailUrl,
+      description:     meta[ch.channelId]?.description  ?? ch.description,
+      source:          'seed' as const,
+      isRemoved:       removedIds.has(ch.channelId),
+      isAgeRestricted: ageRestrictedIds.has(ch.channelId),
     })),
     ...dynamicIds.map(id => ({
-      channelId:    id,
-      name:         meta[id]?.name        ?? 'Unknown Channel',
-      thumbnailUrl: meta[id]?.thumbnailUrl,
-      description:  meta[id]?.description,
-      category:     'education' as const,
-      source:       'dynamic' as const,
-      isRemoved:    removedIds.has(id),
+      channelId:       id,
+      name:            meta[id]?.name        ?? 'Unknown Channel',
+      thumbnailUrl:    meta[id]?.thumbnailUrl,
+      description:     meta[id]?.description,
+      category:        'education' as const,
+      source:          'dynamic' as const,
+      isRemoved:       removedIds.has(id),
+      isAgeRestricted: ageRestrictedIds.has(id),
     })),
   ]
 
@@ -172,6 +177,23 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
           <span className="ml-2 text-gray-400 font-normal text-sm">({activeChannels.length} active)</span>
         </h2>
 
+        {/* Add channel form — at top for easy access */}
+        <form action={addChannel} className="flex gap-2">
+          <input
+            type="url"
+            name="url"
+            placeholder="Paste YouTube channel, handle, or video URL…"
+            required
+            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tnp-purple"
+          />
+          <button
+            type="submit"
+            className="shrink-0 bg-tnp-purple text-white font-semibold rounded-xl px-4 py-2 text-sm hover:opacity-90 transition-opacity"
+          >
+            Add
+          </button>
+        </form>
+
         <div className="space-y-2">
           {activeChannels.map(ch => (
             <ChannelRow key={ch.channelId} channel={ch} />
@@ -190,29 +212,6 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
             </div>
           </details>
         )}
-
-        {/* Add channel form */}
-        <div className="pt-2">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Add a channel</p>
-          <p className="text-xs text-gray-400 mb-3">
-            Paste a YouTube channel URL, handle (/@name), or any video URL from the channel.
-          </p>
-          <form action={addChannel} className="flex gap-2">
-            <input
-              type="url"
-              name="url"
-              placeholder="https://youtube.com/@channelname"
-              required
-              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tnp-purple"
-            />
-            <button
-              type="submit"
-              className="shrink-0 bg-tnp-purple text-white font-semibold rounded-xl px-4 py-2 text-sm hover:opacity-90 transition-opacity"
-            >
-              Add
-            </button>
-          </form>
-        </div>
       </section>
 
       <hr className="border-gray-100" />
@@ -316,7 +315,7 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
 function ChannelRow({
   channel,
 }: {
-  channel: { channelId: string; name: string; category: string; thumbnailUrl?: string; source: 'seed' | 'dynamic'; isRemoved: boolean }
+  channel: { channelId: string; name: string; category: string; thumbnailUrl?: string; source: 'seed' | 'dynamic'; isRemoved: boolean; isAgeRestricted: boolean }
 }) {
   const color = getCategoryColor(channel.category)
   const label = getCategoryLabel(channel.category)
@@ -348,7 +347,24 @@ function ChannelRow({
         </span>
       </div>
 
-      {/* Remove / restore button */}
+      {/* 12+ toggle */}
+      <form action={toggleAgeRestriction}>
+        <input type="hidden" name="channelId" value={channel.channelId} />
+        <input type="hidden" name="restricted" value={(!channel.isAgeRestricted).toString()} />
+        <button
+          type="submit"
+          title={channel.isAgeRestricted ? 'Remove 12+ restriction' : 'Mark as 12+'}
+          className={`text-xs px-2 py-0.5 rounded-full font-bold border transition-colors ${
+            channel.isAgeRestricted
+              ? 'bg-orange-100 text-orange-600 border-orange-200 hover:bg-orange-200'
+              : 'bg-gray-100 text-gray-300 border-gray-200 hover:text-gray-500'
+          }`}
+        >
+          12+
+        </button>
+      </form>
+
+      {/* Remove */}
       <form action={deleteChannel}>
         <input type="hidden" name="channelId" value={channel.channelId} />
         <button

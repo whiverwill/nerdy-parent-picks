@@ -7,6 +7,7 @@ import { resolveChannelId, getVideosByIds } from '@/lib/youtube'
 import {
   addDynamicChannel,
   removeChannel,
+  setAgeRestriction,
   blacklistVideo,
   unblacklistVideo,
   addAdminPick,
@@ -95,6 +96,16 @@ export async function addChannel(formData: FormData) {
   await addDynamicChannel(channelId)
   updateTag('channels')
   redirect('/admin?success=channel-added')
+}
+
+export async function toggleAgeRestriction(formData: FormData) {
+  await requireAdmin()
+  const channelId = formData.get('channelId') as string
+  const restricted = formData.get('restricted') === 'true'
+  if (!channelId) redirect('/admin')
+  await setAgeRestriction(channelId, restricted)
+  updateTag('channels')
+  redirect('/admin')
 }
 
 export async function deleteChannel(formData: FormData) {

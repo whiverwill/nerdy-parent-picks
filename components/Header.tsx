@@ -35,13 +35,13 @@ export default function Header() {
         <nav className="flex items-center shrink-0">
           <Link
             href="/channels"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-tnp-purple text-white text-sm font-bold hover:bg-purple-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full bg-tnp-purple text-white text-sm font-bold hover:bg-purple-700 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
                 d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            Channels
+            <span className="hidden sm:inline">Channels</span>
           </Link>
         </nav>
       </div>

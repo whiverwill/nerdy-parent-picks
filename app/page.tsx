@@ -1,12 +1,14 @@
 import { Suspense } from 'react'
+import { cookies } from 'next/headers'
 import { SEED_PICKS } from '@/lib/channels-data'
 import { CATEGORIES, getCategoryColor } from '@/lib/categories'
 import { getFeedVideos, getPicksVideos, isApiConfigured } from '@/lib/youtube'
 import { getApprovedChannels } from '@/lib/get-channels'
-import { getAdminPicks } from '@/lib/kv'
+import { getAdminPicks, getAgeRestrictedChannelIds } from '@/lib/kv'
 import VideoCard from '@/components/VideoCard'
 import PicksRow from '@/components/PicksRow'
 import FilterChips from '@/components/FilterChips'
+import AgeGate from '@/components/AgeGate'
 import ApiSetupBanner from '@/components/ApiSetupBanner'
 
 interface PageProps {
@@ -20,16 +22,27 @@ export default async function HomePage({ searchParams }: PageProps) {
     return <ApiSetupBanner />
   }
 
-  const allChannels = await getApprovedChannels()
+  const jar = await cookies()
+  const ageUnlocked = jar.get('tnp_age_ok')?.value === '1'
 
-  // Filter channels by selected category
+  const [allChannels, ageRestrictedIds] = await Promise.all([
+    getApprovedChannels(),
+    getAgeRestrictedChannelIds(),
+  ])
+
+  // Hide 12+ channels unless unlocked
+  const visibleChannels = ageUnlocked
+    ? allChannels
+    : allChannels.filter(c => !ageRestrictedIds.has(c.channelId))
+
+  // Filter visible channels by selected category
   const filteredChannels = category
-    ? allChannels.filter(c => c.category === category)
-    : allChannels
+    ? visibleChannels.filter(c => c.category === category)
+    : visibleChannels
 
   // Channel → category lookup for coloring video cards
   const channelCategoryMap: Record<string, string> = {}
-  for (const ch of allChannels) channelCategoryMap[ch.channelId] = ch.category
+  for (const ch of visibleChannels) channelCategoryMap[ch.channelId] = ch.category
 
   const picksPlaylistId = process.env.PICKS_PLAYLIST_ID ?? ''
   const [feedVideos, playlistPicks, adminPicks] = await Promise.all([
@@ -71,10 +84,16 @@ export default async function HomePage({ searchParams }: PageProps) {
       {/* The Nerdy Parent's Picks — powered by your YouTube playlist */}
       <PicksRow videos={picksVideos} />
 
-      {/* Category filter chips */}
-      <Suspense>
-        <FilterChips categories={CATEGORIES} activeCategory={category} />
-      </Suspense>
+      {/* Category filter chips + age gate */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Suspense>
+          <FilterChips categories={CATEGORIES} activeCategory={category} />
+        </Suspense>
+        <AgeGate
+          isUnlocked={ageUnlocked}
+          hasRestrictedChannels={ageRestrictedIds.size > 0}
+        />
+      </div>
 
       {/* Video grid */}
       {feedVideos.length === 0 ? (

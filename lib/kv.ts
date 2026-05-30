@@ -12,10 +12,11 @@ const kv = kvUrl && kvToken ? createClient({ url: kvUrl, token: kvToken }) : nul
 
 // ─── Key names ────────────────────────────────────────────────────────────────
 const KEYS = {
-  dynamicChannels:   'channels:dynamic',   // Set<channelId>
-  removedChannels:   'channels:removed',   // Set<channelId>
-  blacklistedVideos: 'videos:blacklisted', // Hash<videoId → JSON BlacklistedVideo>
-  adminPicks:        'picks:videos',        // Hash<videoId → JSON AdminPick>
+  dynamicChannels:    'channels:dynamic',      // Set<channelId>
+  removedChannels:    'channels:removed',      // Set<channelId>
+  ageRestrictedChannels: 'channels:age-restricted', // Set<channelId>
+  blacklistedVideos:  'videos:blacklisted',    // Hash<videoId → JSON BlacklistedVideo>
+  adminPicks:         'picks:videos',          // Hash<videoId → JSON AdminPick>
 } as const
 
 export function isKvConfigured(): boolean {
@@ -69,6 +70,22 @@ export async function getBlacklistedVideos(): Promise<BlacklistedVideo[]> {
     if (!hash) return []
     return Object.values(hash).map(v => JSON.parse(v as string)) as BlacklistedVideo[]
   } catch { return [] }
+}
+
+export async function getAgeRestrictedChannelIds(): Promise<Set<string>> {
+  if (!kv) return new Set()
+  try {
+    return new Set((await kv.smembers(KEYS.ageRestrictedChannels)) as string[])
+  } catch { return new Set() }
+}
+
+export async function setAgeRestriction(channelId: string, restricted: boolean): Promise<void> {
+  if (!kv) throw new Error('KV not configured')
+  if (restricted) {
+    await kv.sadd(KEYS.ageRestrictedChannels, channelId)
+  } else {
+    await kv.srem(KEYS.ageRestrictedChannels, channelId)
+  }
 }
 
 export async function getAdminPicks(): Promise<AdminPick[]> {
