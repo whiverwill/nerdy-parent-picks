@@ -84,6 +84,26 @@ export async function getFeedVideos(channelIds: string[], maxPerChannel = 4): Pr
   return videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
 }
 
+/** Read a playlist and return the unique channel IDs of all videos in it — cached 1 hour */
+export async function getChannelIdsFromPlaylist(playlistId: string): Promise<string[]> {
+  'use cache'
+  cacheLife('hours')
+
+  if (!API_KEY || !playlistId) return []
+  try {
+    const res = await fetch(
+      `${BASE}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${API_KEY}`
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    const ids = (data.items ?? []).map((item: YouTubePlaylistItem) => item.snippet.channelId)
+    // Return unique channel IDs preserving order of first appearance
+    return [...new Set(ids)] as string[]
+  } catch {
+    return []
+  }
+}
+
 /** Fetch videos from "The Nerdy Parent's Picks" playlist — cached 1 hour */
 export async function getPicksVideos(playlistId: string, maxResults = 20): Promise<Video[]> {
   'use cache'

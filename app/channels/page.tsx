@@ -1,17 +1,11 @@
-import { SEED_CHANNELS } from '@/lib/channels-data'
-import { enrichChannels } from '@/lib/youtube'
+import { getApprovedChannels } from '@/lib/get-channels'
 import ChannelCard from '@/components/ChannelCard'
 import type { Channel } from '@/lib/types'
 
 export default async function ChannelsPage() {
-  // Try to enrich with live thumbnails from YouTube API
-  const meta = await enrichChannels(SEED_CHANNELS.map(c => c.channelId))
-
-  const channels: Channel[] = SEED_CHANNELS.map(ch => ({
-    ...ch,
-    thumbnailUrl: meta[ch.channelId]?.thumbnailUrl ?? ch.thumbnailUrl,
-    description:  meta[ch.channelId]?.description  ?? ch.description,
-  }))
+  // getApprovedChannels merges seed channels + playlist-added channels,
+  // already enriched with YouTube metadata
+  const channels = await getApprovedChannels()
 
   // Group by category
   const byCategory = channels.reduce<Record<string, Channel[]>>((acc, ch) => {

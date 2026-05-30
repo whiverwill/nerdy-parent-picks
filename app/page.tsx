@@ -1,8 +1,10 @@
 import { Suspense } from 'react'
-import { SEED_CHANNELS } from '@/lib/channels-data'
+import { SEED_PICKS } from '@/lib/channels-data'
 import { CATEGORIES, getCategoryColor } from '@/lib/categories'
-import { getFeedVideos, isApiConfigured } from '@/lib/youtube'
+import { getFeedVideos, getPicksVideos, isApiConfigured } from '@/lib/youtube'
+import { getApprovedChannels } from '@/lib/get-channels'
 import VideoCard from '@/components/VideoCard'
+import PicksRow from '@/components/PicksRow'
 import FilterChips from '@/components/FilterChips'
 import ApiSetupBanner from '@/components/ApiSetupBanner'
 
@@ -17,19 +19,39 @@ export default async function HomePage({ searchParams }: PageProps) {
     return <ApiSetupBanner />
   }
 
+  const allChannels = await getApprovedChannels()
+
   // Filter channels by selected category
   const filteredChannels = category
-    ? SEED_CHANNELS.filter(c => c.category === category)
-    : SEED_CHANNELS
+    ? allChannels.filter(c => c.category === category)
+    : allChannels
 
   // Channel → category lookup for coloring video cards
   const channelCategoryMap: Record<string, string> = {}
-  for (const ch of SEED_CHANNELS) channelCategoryMap[ch.channelId] = ch.category
+  for (const ch of allChannels) channelCategoryMap[ch.channelId] = ch.category
 
-  const feedVideos = await getFeedVideos(filteredChannels.map(c => c.channelId), 4)
+  const picksPlaylistId = process.env.PICKS_PLAYLIST_ID ?? ''
+  const [feedVideos, picksVideos] = await Promise.all([
+    getFeedVideos(filteredChannels.map(c => c.channelId), 4),
+    picksPlaylistId
+      ? getPicksVideos(picksPlaylistId)
+      : Promise.resolve(SEED_PICKS.map(p => ({
+          videoId: p.videoId,
+          title: "The Nerdy Parent's Pick",
+          thumbnailUrl: `https://i.ytimg.com/vi/${p.videoId}/hqdefault.jpg`,
+          channelId: '',
+          channelName: p.channelName,
+          publishedAt: new Date().toISOString(),
+          embedType: 'youtube' as const,
+          isPick: true,
+        }))),
+  ])
 
   return (
     <div className="space-y-6">
+      {/* The Nerdy Parent's Picks — powered by your YouTube playlist */}
+      <PicksRow videos={picksVideos} />
+
       {/* Category filter chips */}
       <Suspense>
         <FilterChips categories={CATEGORIES} activeCategory={category} />

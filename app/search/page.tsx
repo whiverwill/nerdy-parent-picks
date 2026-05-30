@@ -1,7 +1,5 @@
-import { Suspense } from 'react'
-import { APPROVED_CHANNEL_IDS } from '@/lib/channels-data'
-import { SEED_CHANNELS } from '@/lib/channels-data'
 import { searchApprovedVideos, isApiConfigured } from '@/lib/youtube'
+import { getApprovedChannels, getApprovedChannelIds } from '@/lib/get-channels'
 import VideoCard from '@/components/VideoCard'
 import { getCategoryColor } from '@/lib/categories'
 
@@ -13,11 +11,16 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams
   const query = q?.trim() ?? ''
 
+  const [allChannels, approvedIds] = await Promise.all([
+    getApprovedChannels(),
+    getApprovedChannelIds(),
+  ])
+
   const channelCategoryMap: Record<string, string> = {}
-  for (const ch of SEED_CHANNELS) channelCategoryMap[ch.channelId] = ch.category
+  for (const ch of allChannels) channelCategoryMap[ch.channelId] = ch.category
 
   const videos = query && isApiConfigured()
-    ? await searchApprovedVideos(query, APPROVED_CHANNEL_IDS)
+    ? await searchApprovedVideos(query, approvedIds)
     : []
 
   return (
