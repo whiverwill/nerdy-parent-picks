@@ -3,6 +3,7 @@ import { SEED_PICKS } from '@/lib/channels-data'
 import { CATEGORIES, getCategoryColor } from '@/lib/categories'
 import { getFeedVideos, getPicksVideos, isApiConfigured } from '@/lib/youtube'
 import { getApprovedChannels } from '@/lib/get-channels'
+import { getAdminPicks } from '@/lib/kv'
 import VideoCard from '@/components/VideoCard'
 import PicksRow from '@/components/PicksRow'
 import FilterChips from '@/components/FilterChips'
@@ -31,8 +32,8 @@ export default async function HomePage({ searchParams }: PageProps) {
   for (const ch of allChannels) channelCategoryMap[ch.channelId] = ch.category
 
   const picksPlaylistId = process.env.PICKS_PLAYLIST_ID ?? ''
-  const [feedVideos, picksVideos] = await Promise.all([
-    getFeedVideos(filteredChannels.map(c => c.channelId), 4),
+  const [feedVideos, playlistPicks, adminPicks] = await Promise.all([
+    getFeedVideos(filteredChannels.map(c => c.channelId), 8),
     picksPlaylistId
       ? getPicksVideos(picksPlaylistId)
       : Promise.resolve(SEED_PICKS.map(p => ({
@@ -45,7 +46,25 @@ export default async function HomePage({ searchParams }: PageProps) {
           embedType: 'youtube' as const,
           isPick: true,
         }))),
+    getAdminPicks(),
   ])
+
+  // Admin picks (newest first) + playlist picks, deduplicating by videoId
+  const adminPickVideos = adminPicks.map(p => ({
+    videoId:      p.videoId,
+    title:        p.title,
+    thumbnailUrl: p.thumbnailUrl,
+    channelId:    p.channelId,
+    channelName:  p.channelName,
+    publishedAt:  p.addedAt,
+    embedType:    'youtube' as const,
+    isPick:       true,
+  }))
+  const adminPickIds = new Set(adminPickVideos.map(v => v.videoId))
+  const picksVideos = [
+    ...adminPickVideos,
+    ...playlistPicks.filter(v => !adminPickIds.has(v.videoId)),
+  ]
 
   return (
     <div className="space-y-6">

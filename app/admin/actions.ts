@@ -9,6 +9,8 @@ import {
   removeChannel,
   blacklistVideo,
   unblacklistVideo,
+  addAdminPick,
+  removeAdminPick,
 } from '@/lib/kv'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -137,4 +139,40 @@ export async function removeFromBlacklist(formData: FormData) {
   await unblacklistVideo(videoId)
   updateTag('videos')
   redirect('/admin?success=video-unblocked')
+}
+
+// ─── Picks actions ────────────────────────────────────────────────────────────
+
+export async function addPick(formData: FormData) {
+  await requireAdmin()
+
+  const url    = formData.get('url') as string
+  const parsed = parseYouTubeUrl(url ?? '')
+
+  if (parsed.type !== 'video') {
+    redirect('/admin?error=not-a-video')
+  }
+
+  const meta = await getVideosByIds([parsed.videoId])
+  const info = meta[parsed.videoId]
+
+  await addAdminPick({
+    videoId:      parsed.videoId,
+    title:        info?.title        ?? 'Unknown Video',
+    thumbnailUrl: info?.thumbnailUrl ?? '',
+    channelId:    info?.channelId    ?? '',
+    channelName:  info?.channelName  ?? '',
+    addedAt:      new Date().toISOString(),
+  })
+  updateTag('picks')
+  redirect('/admin?success=pick-added')
+}
+
+export async function removePick(formData: FormData) {
+  await requireAdmin()
+  const videoId = formData.get('videoId') as string
+  if (!videoId) redirect('/admin')
+  await removeAdminPick(videoId)
+  updateTag('picks')
+  redirect('/admin?success=pick-removed')
 }

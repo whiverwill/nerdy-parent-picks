@@ -6,8 +6,10 @@ import {
   getDynamicChannelIds,
   getRemovedChannelIds,
   getBlacklistedVideos,
+  getAdminPicks,
   isKvConfigured,
   type BlacklistedVideo,
+  type AdminPick,
 } from '@/lib/kv'
 import { getCategoryColor, getCategoryLabel } from '@/lib/categories'
 import {
@@ -17,6 +19,8 @@ import {
   deleteChannel,
   addToBlacklist,
   removeFromBlacklist,
+  addPick,
+  removePick,
 } from './actions'
 import type { Channel } from '@/lib/types'
 
@@ -84,10 +88,11 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
   const kvReady = isKvConfigured()
 
   // Read all state directly from KV (bypasses cache — always fresh)
-  const [dynamicIds, removedIds, blacklistedVideos] = await Promise.all([
+  const [dynamicIds, removedIds, blacklistedVideos, adminPicks] = await Promise.all([
     getDynamicChannelIds(),
     getRemovedChannelIds(),
     getBlacklistedVideos(),
+    getAdminPicks(),
   ])
 
   // Build full channel list with metadata
@@ -115,8 +120,9 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
     })),
   ]
 
-  const activeChannels  = channels.filter(c => !c.isRemoved)
-  const removedChannels = channels.filter(c => c.isRemoved)
+  const sort = (arr: AdminChannel[]) => arr.sort((a, b) => a.name.localeCompare(b.name))
+  const activeChannels  = sort(channels.filter(c => !c.isRemoved))
+  const removedChannels = sort(channels.filter(c => c.isRemoved))
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-10">
@@ -140,6 +146,8 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
           {success === 'channel-removed' && '✅ Channel removed.'}
           {success === 'video-blocked'   && '🚫 Video blocked.'}
           {success === 'video-unblocked' && '✅ Video unblocked.'}
+          {success === 'pick-added'      && "⭐ Added to The Nerdy Parent's Picks!"}
+          {success === 'pick-removed'    && "✅ Removed from Picks."}
         </div>
       )}
       {error && (
@@ -202,6 +210,54 @@ async function AdminPanel({ error, success }: { error?: string; success?: string
               className="shrink-0 bg-tnp-purple text-white font-semibold rounded-xl px-4 py-2 text-sm hover:opacity-90 transition-opacity"
             >
               Add
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <hr className="border-gray-100" />
+
+      {/* ── The Nerdy Parent's Picks ── */}
+      <section className="space-y-4">
+        <h2 className="font-bold text-lg text-gray-900">
+          ⭐ The Nerdy Parent's Picks
+          <span className="ml-2 text-gray-400 font-normal text-sm">
+            ({adminPicks.length} pinned)
+          </span>
+        </h2>
+        <p className="text-xs text-gray-400 -mt-2">
+          These appear at the top of the home page. Newest first.
+          {process.env.PICKS_PLAYLIST_ID && ' Merged with your YouTube Picks playlist.'}
+        </p>
+
+        {adminPicks.length === 0 ? (
+          <p className="text-sm text-gray-400">No picks pinned yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {adminPicks.map(p => (
+              <PickRow key={p.videoId} pick={p} />
+            ))}
+          </div>
+        )}
+
+        <div className="pt-2">
+          <p className="text-sm font-semibold text-gray-700 mb-2">Pin a video</p>
+          <p className="text-xs text-gray-400 mb-3">
+            Paste any YouTube watch URL to feature it in the Picks row.
+          </p>
+          <form action={addPick} className="flex gap-2">
+            <input
+              type="url"
+              name="url"
+              placeholder="https://youtube.com/watch?v=..."
+              required
+              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tnp-purple"
+            />
+            <button
+              type="submit"
+              className="shrink-0 bg-tnp-yellow text-gray-900 font-semibold rounded-xl px-4 py-2 text-sm hover:opacity-90 transition-opacity"
+            >
+              Pin
             </button>
           </form>
         </div>
@@ -301,6 +357,31 @@ function ChannelRow({
           title="Remove channel"
         >
           Remove
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function PickRow({ pick }: { pick: AdminPick }) {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-yellow-50 border border-yellow-100">
+      {pick.thumbnailUrl && (
+        <div className="relative w-20 h-12 rounded-lg overflow-hidden shrink-0">
+          <Image src={pick.thumbnailUrl} alt={pick.title} fill sizes="80px" className="object-cover" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800 line-clamp-1">{pick.title}</p>
+        <p className="text-xs text-gray-400 truncate">{pick.channelName}</p>
+      </div>
+      <form action={removePick}>
+        <input type="hidden" name="videoId" value={pick.videoId} />
+        <button
+          type="submit"
+          className="text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors shrink-0"
+        >
+          Unpin
         </button>
       </form>
     </div>

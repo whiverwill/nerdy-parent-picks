@@ -15,6 +15,7 @@ const KEYS = {
   dynamicChannels:   'channels:dynamic',   // Set<channelId>
   removedChannels:   'channels:removed',   // Set<channelId>
   blacklistedVideos: 'videos:blacklisted', // Hash<videoId → JSON BlacklistedVideo>
+  adminPicks:        'picks:videos',        // Hash<videoId → JSON AdminPick>
 } as const
 
 export function isKvConfigured(): boolean {
@@ -26,6 +27,15 @@ export interface BlacklistedVideo {
   videoId:      string
   title:        string
   thumbnailUrl: string
+  addedAt:      string
+}
+
+export interface AdminPick {
+  videoId:      string
+  title:        string
+  thumbnailUrl: string
+  channelId:    string
+  channelName:  string
   addedAt:      string
 }
 
@@ -61,6 +71,16 @@ export async function getBlacklistedVideos(): Promise<BlacklistedVideo[]> {
   } catch { return [] }
 }
 
+export async function getAdminPicks(): Promise<AdminPick[]> {
+  if (!kv) return []
+  try {
+    const hash = await kv.hgetall(KEYS.adminPicks)
+    if (!hash) return []
+    const picks = Object.values(hash).map(v => JSON.parse(v as string)) as AdminPick[]
+    return picks.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+  } catch { return [] }
+}
+
 // ─── Channel mutations ────────────────────────────────────────────────────────
 
 export async function addDynamicChannel(channelId: string): Promise<void> {
@@ -87,4 +107,16 @@ export async function blacklistVideo(video: BlacklistedVideo): Promise<void> {
 export async function unblacklistVideo(videoId: string): Promise<void> {
   if (!kv) throw new Error('KV not configured')
   await kv.hdel(KEYS.blacklistedVideos, videoId)
+}
+
+// ─── Picks mutations ──────────────────────────────────────────────────────────
+
+export async function addAdminPick(pick: AdminPick): Promise<void> {
+  if (!kv) throw new Error('KV not configured')
+  await kv.hset(KEYS.adminPicks, { [pick.videoId]: JSON.stringify(pick) })
+}
+
+export async function removeAdminPick(videoId: string): Promise<void> {
+  if (!kv) throw new Error('KV not configured')
+  await kv.hdel(KEYS.adminPicks, videoId)
 }
