@@ -1,5 +1,6 @@
-import { cacheLife } from 'next/cache'
+import { cacheLife, cacheTag } from 'next/cache'
 import type { Video, Channel, YouTubeSearchResult, YouTubePlaylistItem, YouTubeChannelResult } from './types'
+import { getBlacklistedVideoIds } from './kv'
 
 const API_KEY = process.env.YOUTUBE_API_KEY
 const BASE = 'https://www.googleapis.com/youtube/v3'
@@ -79,6 +80,7 @@ function mapChannelItem(item: YouTubeChannelResult): Partial<Channel> {
 export async function getChannelVideos(channelId: string, maxResults = 8): Promise<Video[]> {
   'use cache'
   cacheLife('hours')
+  cacheTag('videos')
 
   if (!API_KEY) return []
   try {
@@ -99,15 +101,51 @@ export async function getChannelVideos(channelId: string, maxResults = 8): Promi
   }
 }
 
-/** Fetch latest videos from multiple channels, merged and sorted by date */
+/**
+ * Fetch a page of videos from a channel's uploads playlist, with pagination support.
+ * Returns videos + nextPageToken for infinite scroll. Costs 1 quota unit per call.
+ */
+export async function getChannelVideosPage(
+  channelId: string,
+  maxResults = 20,
+  pageToken?: string,
+): Promise<{ videos: Video[]; nextPageToken?: string }> {
+  'use cache'
+  cacheLife('hours')
+  cacheTag('videos')
+
+  if (!API_KEY) return { videos: [] }
+  try {
+    const uploadsPlaylistId = 'UU' + channelId.slice(2)
+    const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''
+    const res = await fetch(
+      `${BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}${tokenParam}&key=${API_KEY}`
+    )
+    if (!res.ok) return { videos: [] }
+    const data = await res.json()
+    const videos = (data.items ?? [])
+      .filter((item: YouTubePlaylistItem) =>
+        item.snippet.title !== 'Private video' &&
+        item.snippet.title !== 'Deleted video'
+      )
+      .map(mapUploadsItem)
+    return { videos, nextPageToken: data.nextPageToken ?? undefined }
+  } catch {
+    return { videos: [] }
+  }
+}
+
+/** Fetch latest videos from multiple channels, merged, sorted by date, with blacklist applied */
 export async function getFeedVideos(channelIds: string[], maxPerChannel = 8): Promise<Video[]> {
   if (!API_KEY || channelIds.length === 0) return []
-  const results = await Promise.allSettled(
-    channelIds.map(id => getChannelVideos(id, maxPerChannel))
-  )
+  const [results, blacklist] = await Promise.all([
+    Promise.allSettled(channelIds.map(id => getChannelVideos(id, maxPerChannel))),
+    getBlacklistedVideoIds(),
+  ])
   const videos = results
     .filter((r): r is PromiseFulfilledResult<Video[]> => r.status === 'fulfilled')
     .flatMap(r => r.value)
+    .filter(v => !blacklist.has(v.videoId))
   return videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
 }
 
@@ -186,6 +224,36 @@ export async function enrichChannels(channelIds: string[]): Promise<Record<strin
     const map: Record<string, Partial<Channel>> = {}
     for (const item of (data.items ?? [])) {
       map[item.id] = mapChannelItem(item)
+    }
+    return map
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Fetch metadata for specific video IDs — used by admin to get titles/thumbnails.
+ * Not cached (admin needs fresh data). Costs 1 quota unit per call.
+ */
+export async function getVideosByIds(
+  videoIds: string[],
+): Promise<Record<string, { title: string; thumbnailUrl: string; channelId: string; channelName: string }>> {
+  if (!API_KEY || videoIds.length === 0) return {}
+  try {
+    const res = await fetch(
+      `${BASE}/videos?part=snippet&id=${videoIds.join(',')}&key=${API_KEY}`
+    )
+    if (!res.ok) return {}
+    const data = await res.json()
+    const map: Record<string, { title: string; thumbnailUrl: string; channelId: string; channelName: string }> = {}
+    for (const item of (data.items ?? [])) {
+      const t = item.snippet.thumbnails
+      map[item.id] = {
+        title:        item.snippet.title,
+        thumbnailUrl: t.high?.url ?? t.medium?.url ?? t.default?.url ?? '',
+        channelId:    item.snippet.channelId,
+        channelName:  item.snippet.channelTitle,
+      }
     }
     return map
   } catch {

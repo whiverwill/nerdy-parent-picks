@@ -1,47 +1,73 @@
-import { cacheLife } from 'next/cache'
+import { cacheLife, cacheTag } from 'next/cache'
 import { SEED_CHANNELS } from './channels-data'
 import { getChannelIdsFromPlaylist, enrichChannels } from './youtube'
+import { getDynamicChannelIds, getRemovedChannelIds } from './kv'
 import type { Channel } from './types'
 
 /**
  * Returns the full approved channel list — seed channels merged with any
- * channels added via the CHANNELS_PLAYLIST_ID YouTube playlist.
+ * channels added via:
+ *   (a) the CHANNELS_PLAYLIST_ID YouTube playlist, or
+ *   (b) the admin panel (stored in Vercel KV)
  *
- * To add a channel: save any video from it to your Channels playlist in YouTube.
- * To remove a channel: remove that video from the playlist.
+ * Channels explicitly removed via the admin panel are excluded.
+ * All channels are enriched with YouTube thumbnails and descriptions.
  *
- * Cached for 1 hour — changes appear within an hour of updating the playlist.
+ * Cached 1 hour. Use updateTag('channels') to bust immediately.
  */
 export async function getApprovedChannels(): Promise<Channel[]> {
   'use cache'
   cacheLife('hours')
+  cacheTag('channels')
 
   const playlistId = process.env.CHANNELS_PLAYLIST_ID ?? ''
 
-  // Get channel IDs from the playlist (empty array if not configured)
+  // Source 1: YouTube playlist (for channels whose videos can be playlist-saved)
   const playlistChannelIds = playlistId
     ? await getChannelIdsFromPlaylist(playlistId)
     : []
 
-  // Find IDs that aren't already in the seed list
+  // Source 2: Admin-panel additions stored in KV
+  const kvChannelIds = await getDynamicChannelIds()
+
+  // Channels explicitly removed via admin panel
+  const removedIds = await getRemovedChannelIds()
+
   const seedIds = new Set(SEED_CHANNELS.map(c => c.channelId))
-  const newIds = playlistChannelIds.filter(id => !seedIds.has(id))
 
-  if (newIds.length === 0) return SEED_CHANNELS
+  // Merge playlist + KV additions, excluding seed IDs and duplicates
+  const extraIds = [
+    ...playlistChannelIds.filter(id => !seedIds.has(id)),
+    ...kvChannelIds.filter(id => !seedIds.has(id)),
+  ]
+  const uniqueExtraIds = [...new Set(extraIds)]
 
-  // Enrich new channels with names and thumbnails from YouTube
-  const meta = await enrichChannels(newIds)
+  // Enrich ALL channels (seed + extras) in one batched API call = 1 quota unit
+  const allIds = [...SEED_CHANNELS.map(c => c.channelId), ...uniqueExtraIds]
+  const meta = await enrichChannels(allIds)
 
-  const dynamicChannels: Channel[] = newIds.map(id => ({
-    channelId:    id,
-    name:         meta[id]?.name        ?? 'Unknown Channel',
-    thumbnailUrl: meta[id]?.thumbnailUrl,
-    description:  meta[id]?.description,
-    category:     'education', // default — can be updated in seed list later
-    isActive:     true,
-  }))
+  const enrichedSeed: Channel[] = SEED_CHANNELS
+    .filter(ch => !removedIds.has(ch.channelId))
+    .map(ch => ({
+      ...ch,
+      thumbnailUrl: meta[ch.channelId]?.thumbnailUrl ?? ch.thumbnailUrl,
+      description:  meta[ch.channelId]?.description  ?? ch.description,
+    }))
 
-  return [...SEED_CHANNELS, ...dynamicChannels]
+  if (uniqueExtraIds.length === 0) return enrichedSeed
+
+  const dynamicChannels: Channel[] = uniqueExtraIds
+    .filter(id => !removedIds.has(id))
+    .map(id => ({
+      channelId:    id,
+      name:         meta[id]?.name        ?? 'Unknown Channel',
+      thumbnailUrl: meta[id]?.thumbnailUrl,
+      description:  meta[id]?.description,
+      category:     'education' as const,
+      isActive:     true,
+    }))
+
+  return [...enrichedSeed, ...dynamicChannels]
 }
 
 /**

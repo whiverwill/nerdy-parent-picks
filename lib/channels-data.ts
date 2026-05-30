@@ -14,7 +14,6 @@ export const SEED_CHANNELS: Channel[] = [
   { channelId: 'UCwmZiChSryoWQCZMIQezgTg', name: 'BBC Earth',            category: 'nature'      },
   { channelId: 'UClcvOr7LV8tlJwJvkNMmnKg', name: 'Virgin Galactic',      category: 'space'       },
   { channelId: 'UC194cPvPaGJjhJBEGwG6vxg', name: 'OK Go',                category: 'art'         },
-  { channelId: 'UCpVm7bg6pXKo1Pr6k5kxG9A', name: 'National Geographic',  category: 'nature'      },
   { channelId: 'UCqa5gDXXxK0M8gr8WadV4yw', name: 'Travel Kids',          category: 'travel'      },
   { channelId: 'UCY1kMZp36IQSyNx_9h4mpCg', name: 'Mark Rober',           category: 'engineering' },
   { channelId: 'UCMOqf8ab-42UUQIdVoKwjlQ', name: 'Practical Engineering', category: 'engineering' },

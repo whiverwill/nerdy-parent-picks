@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { SEED_CHANNELS } from '@/lib/channels-data'
-import { getChannelVideos, enrichChannels } from '@/lib/youtube'
+import { getApprovedChannels } from '@/lib/get-channels'
+import { getChannelVideosPage, enrichChannels } from '@/lib/youtube'
+import { getBlacklistedVideoIds } from '@/lib/kv'
 import { getCategoryColor, getCategoryLabel } from '@/lib/categories'
-import VideoCard from '@/components/VideoCard'
+import ChannelVideoFeed from '@/components/ChannelVideoFeed'
 
 interface PageProps {
   params: Promise<{ channelId: string }>
@@ -14,21 +15,25 @@ export default async function ChannelDetailPage({ params }: PageProps) {
   const { channelId } = await params
 
   // Verify this is an approved channel
-  const channel = SEED_CHANNELS.find(c => c.channelId === channelId)
+  const allChannels = await getApprovedChannels()
+  const channel = allChannels.find(c => c.channelId === channelId)
   if (!channel) notFound()
 
   const color = getCategoryColor(channel.category)
   const label = getCategoryLabel(channel.category)
 
-  // Fetch channel metadata and videos in parallel
-  const [meta, videos] = await Promise.all([
+  // Fetch channel metadata and first page of videos in parallel.
+  // enrichChannels is already called inside getApprovedChannels, but we call it
+  // here too for the description — it's cached 24h so no extra quota cost.
+  const [meta, firstPage, blacklist] = await Promise.all([
     enrichChannels([channelId]),
-    getChannelVideos(channelId, 20),
+    getChannelVideosPage(channelId, 20),
+    getBlacklistedVideoIds(),
   ])
 
-  const enriched = meta[channelId]
-  const thumbnailUrl = enriched?.thumbnailUrl
-  const description = enriched?.description ?? ''
+  const enriched    = meta[channelId]
+  const thumbnailUrl = channel.thumbnailUrl ?? enriched?.thumbnailUrl
+  const description  = channel.description  ?? enriched?.description ?? ''
 
   return (
     <div className="space-y-6">
@@ -94,29 +99,17 @@ export default async function ChannelDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Videos */}
+      {/* Videos — infinite scroll */}
       <div>
         <h2 className="font-bold text-base text-gray-700 mb-4">
           Latest Videos
-          <span className="ml-2 text-gray-400 font-normal text-sm">({videos.length})</span>
         </h2>
-
-        {videos.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="font-semibold">No videos found for this channel.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {videos.map(video => (
-              <VideoCard
-                key={video.videoId}
-                video={video}
-                categoryColor={color}
-              />
-            ))}
-          </div>
-        )}
+        <ChannelVideoFeed
+          channelId={channelId}
+          initialVideos={firstPage.videos.filter(v => !blacklist.has(v.videoId))}
+          initialNextPageToken={firstPage.nextPageToken}
+          categoryColor={color}
+        />
       </div>
     </div>
   )
