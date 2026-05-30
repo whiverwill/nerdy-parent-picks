@@ -18,6 +18,7 @@ export const SEED_CHANNELS: Channel[] = [
   { channelId: 'UCqa5gDXXxK0M8gr8WadV4yw', name: 'Travel Kids',          category: 'travel'      },
   { channelId: 'UCY1kMZp36IQSyNx_9h4mpCg', name: 'Mark Rober',           category: 'engineering' },
   { channelId: 'UCMOqf8ab-42UUQIdVoKwjlQ', name: 'Practical Engineering', category: 'engineering' },
+  { channelId: 'UCQgAbUR8V1S2_mWKWDSv7EQ', name: 'Sums of Anarchy',       category: 'math'        },
   // These three need channel ID resolution via the YouTube API on first run:
   // Peekaboo Kidz  — legacy URL: youtube.com/user/Peekaboo
   // Deep Look      — legacy URL: youtube.com/user/KQEDDeepLook

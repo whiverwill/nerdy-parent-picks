@@ -1,3 +1,4 @@
+import { cacheLife } from 'next/cache'
 import type { Video, Channel, YouTubeSearchResult, YouTubePlaylistItem, YouTubeChannelResult } from './types'
 
 const API_KEY = process.env.YOUTUBE_API_KEY
@@ -12,29 +13,29 @@ export function isApiConfigured(): boolean {
 function mapSearchItem(item: YouTubeSearchResult): Video {
   const t = item.snippet.thumbnails
   return {
-    videoId:     item.id.videoId,
-    title:       item.snippet.title,
-    description: item.snippet.description,
+    videoId:      item.id.videoId,
+    title:        item.snippet.title,
+    description:  item.snippet.description,
     thumbnailUrl: t.high?.url ?? t.medium?.url ?? t.default?.url ?? '',
-    channelId:   item.snippet.channelId,
-    channelName: item.snippet.channelTitle,
-    publishedAt: item.snippet.publishedAt,
-    embedType:   'youtube',
+    channelId:    item.snippet.channelId,
+    channelName:  item.snippet.channelTitle,
+    publishedAt:  item.snippet.publishedAt,
+    embedType:    'youtube',
   }
 }
 
 function mapPlaylistItem(item: YouTubePlaylistItem): Video {
   const t = item.snippet.thumbnails
   return {
-    videoId:     item.snippet.resourceId.videoId,
-    title:       item.snippet.title,
-    description: item.snippet.description,
+    videoId:      item.snippet.resourceId.videoId,
+    title:        item.snippet.title,
+    description:  item.snippet.description,
     thumbnailUrl: t.high?.url ?? t.medium?.url ?? t.default?.url ?? '',
-    channelId:   item.snippet.channelId,
-    channelName: item.snippet.channelTitle,
-    publishedAt: item.snippet.publishedAt,
-    embedType:   'youtube',
-    isPick:      true,
+    channelId:    item.snippet.channelId,
+    channelName:  item.snippet.channelTitle,
+    publishedAt:  item.snippet.publishedAt,
+    embedType:    'youtube',
+    isPick:       true,
   }
 }
 
@@ -48,15 +49,20 @@ function mapChannelItem(item: YouTubeChannelResult): Partial<Channel> {
   }
 }
 
-// ─── API calls ───────────────────────────────────────────────────────────────
+// ─── Cached API calls ─────────────────────────────────────────────────────────
+// Each function is cached individually by its arguments.
+// getChannelVideos is cached per channelId — 17 channels × 100 units = 1,700 units
+// per cache cycle (1 hour), well within the 10,000/day free quota.
 
-/** Fetch latest videos from a single channel */
+/** Fetch latest videos from a single channel — cached 1 hour per channelId */
 export async function getChannelVideos(channelId: string, maxResults = 8): Promise<Video[]> {
+  'use cache'
+  cacheLife('hours')
+
   if (!API_KEY) return []
   try {
     const res = await fetch(
-      `${BASE}/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${API_KEY}`,
-      { next: { revalidate: 3600 } }
+      `${BASE}/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${API_KEY}`
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -78,13 +84,15 @@ export async function getFeedVideos(channelIds: string[], maxPerChannel = 4): Pr
   return videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
 }
 
-/** Fetch videos from "The Nerdy Parent's Picks" playlist */
+/** Fetch videos from "The Nerdy Parent's Picks" playlist — cached 1 hour */
 export async function getPicksVideos(playlistId: string, maxResults = 20): Promise<Video[]> {
+  'use cache'
+  cacheLife('hours')
+
   if (!API_KEY || !playlistId) return []
   try {
     const res = await fetch(
-      `${BASE}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}&key=${API_KEY}`,
-      { next: { revalidate: 3600 } }
+      `${BASE}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}&key=${API_KEY}`
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -94,7 +102,7 @@ export async function getPicksVideos(playlistId: string, maxResults = 20): Promi
   }
 }
 
-/** Search within approved channels only */
+/** Search within approved channels — not cached (results should always be fresh) */
 export async function searchApprovedVideos(
   query: string,
   approvedChannelIds: Set<string>,
@@ -103,8 +111,7 @@ export async function searchApprovedVideos(
   if (!API_KEY || !query.trim()) return []
   try {
     const res = await fetch(
-      `${BASE}/search?part=snippet&q=${encodeURIComponent(query)}&maxResults=${maxResults}&type=video&key=${API_KEY}`,
-      { cache: 'no-store' }
+      `${BASE}/search?part=snippet&q=${encodeURIComponent(query)}&maxResults=${maxResults}&type=video&key=${API_KEY}`
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -116,14 +123,16 @@ export async function searchApprovedVideos(
   }
 }
 
-/** Enrich channel metadata (thumbnail, description) from YouTube */
+/** Enrich channel metadata (thumbnail, description) — cached 24 hours */
 export async function enrichChannels(channelIds: string[]): Promise<Record<string, Partial<Channel>>> {
+  'use cache'
+  cacheLife('days')
+
   if (!API_KEY || channelIds.length === 0) return {}
   try {
     const ids = channelIds.join(',')
     const res = await fetch(
-      `${BASE}/channels?part=snippet&id=${ids}&key=${API_KEY}`,
-      { next: { revalidate: 86400 } }
+      `${BASE}/channels?part=snippet&id=${ids}&key=${API_KEY}`
     )
     if (!res.ok) return {}
     const data = await res.json()
@@ -137,13 +146,15 @@ export async function enrichChannels(channelIds: string[]): Promise<Record<strin
   }
 }
 
-/** Resolve a legacy /user/ or handle URL to a channel ID */
+/** Resolve a legacy /user/ or handle URL to a channel ID — cached 24 hours */
 export async function resolveChannelId(handle: string): Promise<string | null> {
+  'use cache'
+  cacheLife('days')
+
   if (!API_KEY) return null
   try {
     const res = await fetch(
-      `${BASE}/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${API_KEY}`,
-      { next: { revalidate: 86400 } }
+      `${BASE}/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${API_KEY}`
     )
     if (!res.ok) return null
     const data = await res.json()
