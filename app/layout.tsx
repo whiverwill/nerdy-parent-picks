@@ -19,7 +19,11 @@ export const metadata: Metadata = {
     title: 'TNP Picks',
   },
   icons: {
-    apple: '/icon-180.png',
+    apple: [
+      { url: '/icon-152.png', sizes: '152x152' },
+      { url: '/icon-167.png', sizes: '167x167' },
+      { url: '/icon-180.png', sizes: '180x180' },
+    ],
   },
 }
 

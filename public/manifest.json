@@ -1,5 +1,5 @@
 {
-  "name": "The Nerdy Parent Picks",
+  "name": "Nerdy Parent Picks",
   "short_name": "TNP Picks",
   "description": "Curated videos for curious kids — hand-picked by a nerdy parent.",
   "start_url": "/",
@@ -8,6 +8,21 @@
   "background_color": "#ffffff",
   "theme_color": "#7B52B9",
   "icons": [
+    {
+      "src": "/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-167.png",
+      "sizes": "167x167",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -21,6 +36,5 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "kids"],
-  "screenshots": []
+  "categories": ["education", "kids"]
 }
