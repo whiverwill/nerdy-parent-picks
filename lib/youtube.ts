@@ -162,7 +162,10 @@ export async function getChannelIdsFromPlaylist(playlistId: string): Promise<str
     )
     if (!res.ok) return []
     const data = await res.json()
-    const ids = (data.items ?? []).map((item: YouTubePlaylistItem) => item.snippet.channelId)
+    // videoOwnerChannelId = the actual video creator; channelId = playlist owner (not what we want)
+    const ids = (data.items ?? []).map((item: YouTubePlaylistItem) =>
+      item.snippet.videoOwnerChannelId ?? item.snippet.channelId
+    )
     // Return unique channel IDs preserving order of first appearance
     return [...new Set(ids)] as string[]
   } catch {
