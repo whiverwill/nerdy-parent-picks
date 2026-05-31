@@ -32,8 +32,9 @@ function mapPlaylistItem(item: YouTubePlaylistItem): Video {
     title:        item.snippet.title,
     description:  item.snippet.description,
     thumbnailUrl: t.high?.url ?? t.medium?.url ?? t.default?.url ?? '',
-    channelId:    item.snippet.channelId,
-    channelName:  item.snippet.channelTitle,
+    // videoOwnerChannelId/Title are the actual creator, not the playlist owner
+    channelId:    item.snippet.videoOwnerChannelId ?? item.snippet.channelId,
+    channelName:  item.snippet.videoOwnerChannelTitle ?? item.snippet.channelTitle,
     publishedAt:  item.snippet.publishedAt,
     embedType:    'youtube',
     isPick:       true,

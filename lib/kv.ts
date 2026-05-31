@@ -68,7 +68,10 @@ export async function getBlacklistedVideos(): Promise<BlacklistedVideo[]> {
   try {
     const hash = await kv.hgetall(KEYS.blacklistedVideos)
     if (!hash) return []
-    return Object.values(hash).map(v => JSON.parse(v as string)) as BlacklistedVideo[]
+    // @upstash/redis already JSON.parse()s hash values — don't parse twice
+    return Object.values(hash).map(v =>
+      (typeof v === 'string' ? JSON.parse(v) : v) as BlacklistedVideo
+    )
   } catch { return [] }
 }
 
@@ -93,7 +96,10 @@ export async function getAdminPicks(): Promise<AdminPick[]> {
   try {
     const hash = await kv.hgetall(KEYS.adminPicks)
     if (!hash) return []
-    const picks = Object.values(hash).map(v => JSON.parse(v as string)) as AdminPick[]
+    // @upstash/redis already JSON.parse()s hash values — don't parse twice
+    const picks = Object.values(hash).map(v =>
+      (typeof v === 'string' ? JSON.parse(v) : v) as AdminPick
+    )
     return picks.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
   } catch { return [] }
 }

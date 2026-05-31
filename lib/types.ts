@@ -49,6 +49,9 @@ export interface YouTubePlaylistItem {
     description: string
     channelId: string
     channelTitle: string
+    /** Actual video creator — present in playlist item responses */
+    videoOwnerChannelId?: string
+    videoOwnerChannelTitle?: string
     publishedAt: string
     thumbnails: {
       medium?: { url: string }

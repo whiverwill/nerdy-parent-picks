@@ -31,8 +31,8 @@ export default function AgeGate({ isUnlocked, hasRestrictedChannels }: Props) {
   const [problem, setProblem] = useState(randomProblem)
   const [answer, setAnswer]   = useState('')
   const [wrong, setWrong]     = useState(false)
+  const [shake, setShake]     = useState(false)
 
-  // Nothing to show if there are no restricted channels at all
   if (!hasRestrictedChannels) return null
 
   function openModal() {
@@ -44,22 +44,30 @@ export default function AgeGate({ isUnlocked, hasRestrictedChannels }: Props) {
 
   function unlock() {
     if (parseInt(answer.trim(), 10) === problem.a) {
-      // Session cookie — expires when browser is closed
       document.cookie = 'tnp_age_ok=1; path=/'
       setOpen(false)
       router.refresh()
     } else {
+      // Show wrong alert + shake input + new problem
       setWrong(true)
-      setProblem(randomProblem())
+      setShake(true)
       setAnswer('')
+      setTimeout(() => {
+        setShake(false)
+        setProblem(randomProblem())
+      }, 600)
     }
   }
 
   return (
     <>
+      {/* ── Chip shown next to filter bar ── */}
       {isUnlocked ? (
-        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-orange-200 bg-orange-50 text-xs text-orange-500 font-semibold">
-          🔓 12+ on
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 border-green-400 bg-green-50 text-xs text-green-700 font-bold">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          All ages included
         </span>
       ) : (
         <button
@@ -70,6 +78,7 @@ export default function AgeGate({ isUnlocked, hasRestrictedChannels }: Props) {
         </button>
       )}
 
+      {/* ── Modal ── */}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -82,13 +91,22 @@ export default function AgeGate({ isUnlocked, hasRestrictedChannels }: Props) {
               <p className="text-xs text-gray-400 mt-1">Answer the algebra problem to show 12+ channels</p>
             </div>
 
+            {/* Wrong answer alert */}
+            {wrong && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <span className="text-lg shrink-0">❌</span>
+                <p className="text-sm text-red-700 font-semibold">
+                  That's not right — give it another try!
+                </p>
+              </div>
+            )}
+
+            {/* Problem */}
             <div className="bg-gray-50 rounded-xl px-4 py-4 text-center">
-              {wrong && (
-                <p className="text-xs text-red-500 mb-2">Not quite — try this one:</p>
-              )}
               <p className="font-semibold text-gray-800 text-base">{problem.q}</p>
             </div>
 
+            {/* Answer input */}
             <input
               type="number"
               inputMode="numeric"
@@ -97,7 +115,13 @@ export default function AgeGate({ isUnlocked, hasRestrictedChannels }: Props) {
               onKeyDown={e => e.key === 'Enter' && unlock()}
               placeholder="x = ?"
               autoFocus
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-tnp-purple"
+              className={`w-full rounded-xl border px-4 py-3 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-tnp-purple transition-colors ${
+                shake
+                  ? 'border-red-400 bg-red-50 animate-bounce'
+                  : wrong
+                  ? 'border-red-300'
+                  : 'border-gray-200'
+              }`}
             />
 
             <div className="flex gap-2">

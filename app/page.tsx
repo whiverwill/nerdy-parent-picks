@@ -1,11 +1,11 @@
 import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 import { SEED_PICKS } from '@/lib/channels-data'
-import { CATEGORIES, getCategoryColor } from '@/lib/categories'
+import { CATEGORIES } from '@/lib/categories'
 import { getFeedVideos, getPicksVideos, isApiConfigured } from '@/lib/youtube'
 import { getApprovedChannels } from '@/lib/get-channels'
 import { getAdminPicks, getAgeRestrictedChannelIds } from '@/lib/kv'
-import VideoCard from '@/components/VideoCard'
+import HomeFeed from '@/components/HomeFeed'
 import PicksRow from '@/components/PicksRow'
 import FilterChips from '@/components/FilterChips'
 import AgeGate from '@/components/AgeGate'
@@ -95,7 +95,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* Video grid */}
+      {/* Video grid — client component handles watched-video filtering */}
       {feedVideos.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">📭</p>
@@ -103,15 +103,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           <p className="text-sm mt-1">Try selecting a different filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {feedVideos.map(video => (
-            <VideoCard
-              key={video.videoId}
-              video={video}
-              categoryColor={getCategoryColor(channelCategoryMap[video.channelId] ?? '')}
-            />
-          ))}
-        </div>
+        <HomeFeed videos={feedVideos} channelCategoryMap={channelCategoryMap} />
       )}
     </div>
   )

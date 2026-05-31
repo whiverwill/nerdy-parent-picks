@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { SEED_CHANNELS } from '@/lib/channels-data'
 import { getChannelVideos, isApiConfigured } from '@/lib/youtube'
 import VideoCard from '@/components/VideoCard'
+import VideoPlayer from '@/components/VideoPlayer'
+import WatchedTracker from '@/components/WatchedTracker'
 import { getCategoryColor } from '@/lib/categories'
 
 interface PageProps {
@@ -29,15 +31,12 @@ export default async function WatchPage({ params }: PageProps) {
         Back
       </Link>
 
-      {/* Player */}
+      {/* Mark as watched in localStorage as soon as the page opens */}
+      <WatchedTracker videoId={videoId} />
+
+      {/* Player — VideoPlayer is a client component so it can stop audio on unmount */}
       <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg">
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1`}
-          title="YouTube video player"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="w-full h-full"
-        />
+        <VideoPlayer videoId={videoId} />
       </div>
 
       {/* Related videos section — loads from the full feed */}
