@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import VideoCard from '@/components/VideoCard'
 import type { Video } from '@/lib/types'
 import { getWatchedIds } from '@/lib/watched'
@@ -9,28 +9,81 @@ import { getCategoryColor } from '@/lib/categories'
 interface Props {
   videos: Video[]
   channelCategoryMap: Record<string, string>
+  channelIds: string[]
+  initialPageTokens: Record<string, string>
 }
 
-export default function HomeFeed({ videos, channelCategoryMap }: Props) {
-  // Start with "not yet mounted" so SSR + first render show all videos
-  // (localStorage is unavailable server-side, so we hydrate after mount)
-  const [watchedIds, setWatchedIds]   = useState<Set<string>>(new Set())
-  const [mounted, setMounted]         = useState(false)
-  const [showWatched, setShowWatched] = useState(false)
+export default function HomeFeed({
+  videos: initialVideos,
+  channelCategoryMap,
+  channelIds,
+  initialPageTokens,
+}: Props) {
+  const [allVideos, setAllVideos]       = useState<Video[]>(initialVideos)
+  const [pageTokens, setPageTokens]     = useState(initialPageTokens)
+  const [loading, setLoading]           = useState(false)
+  const [exhausted, setExhausted]       = useState(Object.keys(initialPageTokens).length === 0)
+
+  // Watched-video tracking (localStorage, hydrates after mount)
+  const [watchedIds, setWatchedIds]     = useState<Set<string>>(new Set())
+  const [mounted, setMounted]           = useState(false)
+  const [showWatched, setShowWatched]   = useState(false)
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setWatchedIds(getWatchedIds())
     setMounted(true)
   }, [])
 
-  // Only split after hydration to avoid layout shift
-  const unwatched = mounted ? videos.filter(v => !watchedIds.has(v.videoId)) : videos
-  const watched   = mounted ? videos.filter(v =>  watchedIds.has(v.videoId)) : []
+  const loadMore = useCallback(async () => {
+    if (loading || exhausted) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/feed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelIds, pageTokens }),
+      })
+      const data = await res.json() as {
+        videos: Video[]
+        nextPageTokens: Record<string, string>
+      }
+      setAllVideos(prev => {
+        // Deduplicate in case the same video appears at a page boundary
+        const existingIds = new Set(prev.map(v => v.videoId))
+        const fresh = data.videos.filter(v => !existingIds.has(v.videoId))
+        return [...prev, ...fresh]
+      })
+      setPageTokens(data.nextPageTokens)
+      if (Object.keys(data.nextPageTokens).length === 0) setExhausted(true)
+    } catch {
+      setExhausted(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [channelIds, pageTokens, loading, exhausted])
+
+  // IntersectionObserver — triggers loadMore when sentinel scrolls into view
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || exhausted) return
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '400px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loadMore, exhausted])
+
+  // Split into unwatched / watched (after hydration to avoid layout shift)
+  const unwatched = mounted ? allVideos.filter(v => !watchedIds.has(v.videoId)) : allVideos
+  const watched   = mounted ? allVideos.filter(v =>  watchedIds.has(v.videoId)) : []
 
   return (
     <>
       {/* ── Main feed ── */}
-      {unwatched.length === 0 ? (
+      {unwatched.length === 0 && !loading ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">📭</p>
           <p className="font-semibold">
@@ -53,6 +106,23 @@ export default function HomeFeed({ videos, channelCategoryMap }: Props) {
               categoryColor={getCategoryColor(channelCategoryMap[video.channelId] ?? '')}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Infinite scroll sentinel + spinner ── */}
+      {!exhausted && (
+        <div ref={sentinelRef} className="flex justify-center py-10">
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10"
+                  stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Loading more…
+            </div>
+          )}
         </div>
       )}
 

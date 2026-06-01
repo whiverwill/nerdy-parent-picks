@@ -136,18 +136,31 @@ export async function getChannelVideosPage(
   }
 }
 
-/** Fetch latest videos from multiple channels, merged, sorted by date, with blacklist applied */
-export async function getFeedVideos(channelIds: string[], maxPerChannel = 8): Promise<Video[]> {
-  if (!API_KEY || channelIds.length === 0) return []
+export interface FeedPage {
+  videos: Video[]
+  /** nextPageToken per channel — only entries for channels that have more videos */
+  nextPageTokens: Record<string, string>
+}
+
+/** Fetch latest videos from multiple channels, merged and sorted by date, with blacklist applied */
+export async function getFeedVideos(channelIds: string[], maxPerChannel = 8): Promise<FeedPage> {
+  if (!API_KEY || channelIds.length === 0) return { videos: [], nextPageTokens: {} }
   const [results, blacklist] = await Promise.all([
-    Promise.allSettled(channelIds.map(id => getChannelVideos(id, maxPerChannel))),
+    Promise.allSettled(channelIds.map(id => getChannelVideosPage(id, maxPerChannel))),
     getBlacklistedVideoIds(),
   ])
+  const nextPageTokens: Record<string, string> = {}
   const videos = results
-    .filter((r): r is PromiseFulfilledResult<Video[]> => r.status === 'fulfilled')
-    .flatMap(r => r.value)
+    .flatMap((r, i) => {
+      if (r.status !== 'fulfilled') return []
+      if (r.value.nextPageToken) nextPageTokens[channelIds[i]] = r.value.nextPageToken
+      return r.value.videos
+    })
     .filter(v => !blacklist.has(v.videoId))
-  return videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+  return {
+    videos: videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
+    nextPageTokens,
+  }
 }
 
 /** Read a playlist and return the unique channel IDs of all videos in it — cached 1 hour */

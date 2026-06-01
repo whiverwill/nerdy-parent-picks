@@ -50,7 +50,7 @@ export default async function WatchPage({ params }: PageProps) {
 async function RelatedVideos({ channelCategoryMap }: { channelCategoryMap: Record<string, string> }) {
   // Pull a sample from all channels to show as "More to Watch"
   const { getFeedVideos } = await import('@/lib/youtube')
-  const videos = await getFeedVideos(
+  const { videos } = await getFeedVideos(
     SEED_CHANNELS.map(c => c.channelId).slice(0, 6),
     2
   )

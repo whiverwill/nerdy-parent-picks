@@ -44,9 +44,10 @@ export default async function HomePage({ searchParams }: PageProps) {
   const channelCategoryMap: Record<string, string> = {}
   for (const ch of visibleChannels) channelCategoryMap[ch.channelId] = ch.category
 
+  const filteredChannelIds = filteredChannels.map(c => c.channelId)
   const picksPlaylistId = process.env.PICKS_PLAYLIST_ID ?? ''
-  const [feedVideos, playlistPicks, adminPicks] = await Promise.all([
-    getFeedVideos(filteredChannels.map(c => c.channelId), 8),
+  const [feedPage, playlistPicks, adminPicks] = await Promise.all([
+    getFeedVideos(filteredChannelIds, 8),
     picksPlaylistId
       ? getPicksVideos(picksPlaylistId)
       : Promise.resolve(SEED_PICKS.map(p => ({
@@ -95,15 +96,21 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* Video grid — client component handles watched-video filtering */}
-      {feedVideos.length === 0 ? (
+      {/* Video grid — client component handles watched-video filtering + infinite scroll */}
+      {feedPage.videos.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">📭</p>
           <p className="font-semibold">No videos found for this category.</p>
           <p className="text-sm mt-1">Try selecting a different filter.</p>
         </div>
       ) : (
-        <HomeFeed videos={feedVideos} channelCategoryMap={channelCategoryMap} />
+        <HomeFeed
+          key={category ?? 'all'}
+          videos={feedPage.videos}
+          channelCategoryMap={channelCategoryMap}
+          channelIds={filteredChannelIds}
+          initialPageTokens={feedPage.nextPageTokens}
+        />
       )}
     </div>
   )
