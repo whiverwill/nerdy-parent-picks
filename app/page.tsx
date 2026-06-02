@@ -78,7 +78,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   const picksVideos = [
     ...adminPickVideos,
     ...playlistPicks.filter(v => !adminPickIds.has(v.videoId)),
-  ]
+  ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
 
   return (
     <div className="space-y-6">
