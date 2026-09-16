@@ -10,6 +10,7 @@ const nunito = Nunito({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://watch.thenerdyparent.com'),
   title: 'The Nerdy Parent Picks',
   description: 'Curated videos for curious kids — hand-picked by a nerdy parent.',
   manifest: '/manifest.json',
@@ -28,6 +29,19 @@ export const metadata: Metadata = {
       { url: '/icon-167.png', sizes: '167x167' },
       { url: '/icon-180.png', sizes: '180x180' },
     ],
+  },
+  openGraph: {
+    title: 'The Nerdy Parent Picks',
+    description: 'Curated videos for curious kids — hand-picked by a nerdy parent.',
+    siteName: 'The Nerdy Parent Picks',
+    images: ['/logo.png'],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'The Nerdy Parent Picks',
+    description: 'Curated videos for curious kids — hand-picked by a nerdy parent.',
+    images: ['/logo.png'],
   },
 }
 

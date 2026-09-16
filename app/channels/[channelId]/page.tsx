@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getApprovedChannels } from '@/lib/get-channels'
 import { getChannelVideosPage, enrichChannels } from '@/lib/youtube'
@@ -9,6 +10,35 @@ import ChannelVideoFeed from '@/components/ChannelVideoFeed'
 
 interface PageProps {
   params: Promise<{ channelId: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { channelId } = await params
+  const allChannels = await getApprovedChannels()
+  const channel = allChannels.find(c => c.channelId === channelId)
+
+  if (!channel) return {}
+
+  const title = channel.name
+  const description = channel.description || 'A curated channel on The Nerdy Parent Picks'
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: channel.thumbnailUrl ? [channel.thumbnailUrl] : undefined,
+      url: `/channels/${channelId}`,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+      images: channel.thumbnailUrl ? [channel.thumbnailUrl] : undefined,
+    },
+  }
 }
 
 export default async function ChannelDetailPage({ params }: PageProps) {

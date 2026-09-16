@@ -1,6 +1,7 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { SEED_CHANNELS } from '@/lib/channels-data'
-import { getChannelVideos, isApiConfigured } from '@/lib/youtube'
+import { getChannelVideos, getVideosByIds, isApiConfigured } from '@/lib/youtube'
 import VideoCard from '@/components/VideoCard'
 import VideoPlayer from '@/components/VideoPlayer'
 import WatchedTracker from '@/components/WatchedTracker'
@@ -8,6 +9,35 @@ import { getCategoryColor } from '@/lib/categories'
 
 interface PageProps {
   params: Promise<{ videoId: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { videoId } = await params
+  const videos = await getVideosByIds([videoId])
+  const video = videos[videoId]
+
+  if (!video) return {}
+
+  const title = video.title
+  const description = video.channelName ? `From ${video.channelName} — The Nerdy Parent Picks` : undefined
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: video.thumbnailUrl ? [video.thumbnailUrl] : undefined,
+      url: `/watch/${videoId}`,
+      type: 'video.other',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: video.thumbnailUrl ? [video.thumbnailUrl] : undefined,
+    },
+  }
 }
 
 export default async function WatchPage({ params }: PageProps) {
