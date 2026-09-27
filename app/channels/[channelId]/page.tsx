@@ -7,6 +7,7 @@ import { getChannelVideosPage, enrichChannels } from '@/lib/youtube'
 import { getBlacklistedVideoIds } from '@/lib/kv'
 import { getCategoryColor, getCategoryLabel } from '@/lib/categories'
 import ChannelVideoFeed from '@/components/ChannelVideoFeed'
+import { proxyThumb } from '@/lib/thumb'
 
 interface PageProps {
   params: Promise<{ channelId: string }>
@@ -84,7 +85,7 @@ export default async function ChannelDetailPage({ params }: PageProps) {
         <div className="relative w-20 h-20 rounded-full overflow-hidden shrink-0 ring-4 ring-white shadow-md">
           {thumbnailUrl ? (
             <Image
-              src={thumbnailUrl}
+              src={proxyThumb(thumbnailUrl)}
               alt={channel.name}
               fill
               sizes="80px"

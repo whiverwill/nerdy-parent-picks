@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Video } from '@/lib/types'
+import { proxyThumb } from '@/lib/thumb'
 
 interface Props {
   videos: Video[]
@@ -31,7 +32,7 @@ export default function PicksRow({ videos }: Props) {
             <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-100 ring-2 ring-tnp-purple/30 group-hover:ring-tnp-purple transition-all">
               {video.thumbnailUrl ? (
                 <Image
-                  src={video.thumbnailUrl}
+                  src={proxyThumb(video.thumbnailUrl)}
                   alt={video.title}
                   fill
                   sizes="208px"

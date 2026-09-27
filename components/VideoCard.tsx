@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { Video } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categories'
+import { proxyThumb } from '@/lib/thumb'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -29,7 +30,7 @@ export default function VideoCard({ video, categoryColor }: Props) {
       <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-100">
         {video.thumbnailUrl ? (
           <Image
-            src={video.thumbnailUrl}
+            src={proxyThumb(video.thumbnailUrl)}
             alt={video.title}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

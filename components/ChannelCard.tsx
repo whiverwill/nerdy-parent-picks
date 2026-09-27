@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { Channel } from '@/lib/types'
 import { getCategoryColor, getCategoryLabel } from '@/lib/categories'
+import { proxyThumb } from '@/lib/thumb'
 
 interface Props {
   channel: Channel
@@ -20,7 +21,7 @@ export default function ChannelCard({ channel }: Props) {
       <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-100 ring-2 ring-transparent group-hover:ring-tnp-purple transition-all">
         {channel.thumbnailUrl ? (
           <Image
-            src={channel.thumbnailUrl}
+            src={proxyThumb(channel.thumbnailUrl)}
             alt={channel.name}
             fill
             sizes="64px"
