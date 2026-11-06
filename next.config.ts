@@ -32,6 +32,8 @@ const nextConfig: NextConfig = {
               "connect-src 'self' https://www.googleapis.com",
             ].join('; '),
           },
+          // Members-only app — keep it out of search indexes.
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
         ],
       },
     ]

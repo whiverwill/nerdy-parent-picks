@@ -1,6 +1,7 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import SearchBar from './SearchBar'
+import HeaderNav from './HeaderNav'
 
 export default function Header() {
   return (
@@ -26,24 +27,9 @@ export default function Header() {
           />
         </Link>
 
-        {/* Search — grows to fill space */}
-        <div className="flex-1">
-          <SearchBar />
-        </div>
-
-        {/* Nav links */}
-        <nav className="flex items-center shrink-0">
-          <Link
-            href="/channels"
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full bg-tnp-purple text-white text-sm font-bold hover:bg-purple-700 transition-colors"
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            <span className="hidden sm:inline">Channels</span>
-          </Link>
-        </nav>
+        <Suspense fallback={<div className="flex-1" />}>
+          <HeaderNav />
+        </Suspense>
       </div>
     </header>
   )

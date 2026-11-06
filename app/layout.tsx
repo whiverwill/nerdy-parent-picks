@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://watch.thenerdyparent.com'),
   title: 'The Nerdy Parent Picks',
   description: 'Curated videos for curious kids — hand-picked by a nerdy parent.',
+  robots: { index: false, follow: false },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
