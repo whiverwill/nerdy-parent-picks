@@ -2,6 +2,7 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  partialPrefetching: true,
   images: {
     // Thumbnails are already-optimized YouTube JPEGs served at the right size.
     // Routing them through Vercel's image optimizer adds no value and exhausts
